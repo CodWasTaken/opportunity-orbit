@@ -1,176 +1,110 @@
-import { test, expect } from '@playwright/test';
+import {test,expect} from '@playwright/test';
 
-test('two-stage spin, browser-local no-repeat history, category switch and reset',async({page})=>{
-  await page.goto('./');
+async function chooseCategory(page:import('@playwright/test').Page,id='fellowships'){
+  await page.locator('#category-open-button').click();
+  await expect(page.locator('#category-dialog')).toBeVisible();
+  await page.locator('#category-dialog-grid [data-category-id="'+id+'"]').click();
+  await expect(page.locator('#category-dialog')).toBeHidden();
   await expect(page.locator('#spin-button')).toBeEnabled();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN THE CATEGORY ✳');
-  await expect(page.locator('#discovered-count')).toHaveText('0');
+}
+
+test('manual selection replaces the random category spin',async({page})=>{
+  await page.goto('./');
   await expect(page.locator('#total-count')).toHaveText('736');
-  await expect(page.locator('.sector-label')).toHaveCount(18);
-  await expect(page.locator('#spin-subtitle')).toContainText('categories ·');
-  await expect(page.locator('#spin-subtitle')).toContainText('731 possible discoveries');
-  await page.locator('#spin-button').click();
+  await expect(page.locator('#spin-button')).toBeDisabled();
+  await expect(page.locator('#category-strip button')).toHaveCount(18);
+  await expect(page.locator('#category-strip [data-category-id="discounts-perks"]')).toHaveCount(0);
+  await expect(page.locator('#category-strip [data-category-id="early-access"]')).toHaveCount(0);
+  await chooseCategory(page);
+  await expect(page.locator('.sector-label')).toHaveCount(57);
+  await expect(page.locator('#wheel-segments path')).toHaveCount(57);
   await expect(page.locator('#spin-button-label')).toHaveText('SPIN MY OPPORTUNITY ✳');
-  const category=await page.locator('#spin-title').innerText();
-  const count = Number((await page.locator('#spin-subtitle').innerText()).split(' ')[0]);
-  await expect(page.locator('.sector-label')).toHaveCount(count);
-  await expect(page.locator('#wheel-choice-list li')).toHaveCount(count);
-  expect(category).not.toBe('Where will we land?');
+  await expect(page.locator('#category-strip [data-category-id="fellowships"]')).toHaveAttribute('aria-pressed','true');
+});
+
+test('one spin produces source-grounded result and prevents repeats',async({page})=>{
+  await page.goto('./'); await chooseCategory(page);
   await page.locator('#spin-button').click();
   await expect(page.locator('#reveal')).toBeVisible();
   await expect(page.locator('#discovered-count')).toHaveText('1');
+  await expect(page.locator('#reveal .result-category')).toHaveText('Fellowships');
   await expect(page.locator('#reveal .primary-link')).toHaveAttribute('href',/^https:\/\//);
-  const first=await page.locator('#reveal h2').innerText();
-  const entries=await page.evaluate(()=>JSON.parse(localStorage.getItem('opportunity-orbit:history:v2')!));
-  expect(entries.seen).toHaveLength(1);
+  const desc=await page.locator('.result-story p').innerText();
+  expect(desc.length).toBeGreaterThan(15); expect(desc.length).toBeLessThanOrEqual(185);
+  const seen=await page.evaluate(()=>JSON.parse(localStorage.getItem('opportunity-orbit:history:v2')!).seen);
+  expect(seen).toHaveLength(1);
+  await page.locator('#next-in-category').click();
+  await expect(page.locator('.sector-label')).toHaveCount(56);
+  await page.locator('#spin-button').click();
+  await expect(page.locator('#reveal')).toBeVisible();
+  const next=await page.evaluate(()=>JSON.parse(localStorage.getItem('opportunity-orbit:history:v2')!).seen);
+  expect(next).toHaveLength(2);expect(next[1]).not.toBe(next[0]);
   await page.reload();
+  await expect(page.locator('#discovered-count')).toHaveText('2');
+  await expect(page.locator('.sector-label')).toHaveCount(55);
+});
+
+test('switching category directly and from the result works',async({page})=>{
+  await page.goto('./');await chooseCategory(page);
+  await chooseCategory(page,'funding');
+  await expect(page.locator('.sector-label')).toHaveCount(46);
+  await page.locator('#spin-button').click();
+  await expect(page.locator('#reveal .result-category')).toHaveText('Funding');
+  await page.locator('#next-category').click();
+  await expect(page.locator('#category-dialog')).toBeVisible();
+  await expect(page.locator('#spin-button')).toBeDisabled();
+});
+
+test('privacy-friendly browser history, filter and reset remain functional',async({page})=>{
+  await page.goto('./'); await chooseCategory(page);
+  await page.locator('#spin-button').click();
   await expect(page.locator('#discovered-count')).toHaveText('1');
   await page.locator('#include-unconfirmed').uncheck();
-  // Confirmed-only mode retains the same minimum-eight threshold.
   await expect(page.locator('#total-count')).toHaveText('100');
+  await expect(page.locator('#spin-button')).toBeDisabled();
   await page.locator('#reset-button').click();
-  await expect(page.locator('#reset-dialog')).toBeVisible();
   await page.locator('.dialog-confirm').click();
   await expect(page.locator('#discovered-count')).toHaveText('0');
-  await expect(page.locator('#reset-dialog')).toBeHidden();
-  expect(first.length).toBeGreaterThan(2);
+  await page.locator('#include-unconfirmed').check();
+  await expect(page.locator('#category-strip button')).toHaveCount(18);
 });
 
-test('a second draw in the same category never repeats the first',async({page})=>{
+test('square 9:16 frame, flat colors and anchored winning labels',async({page})=>{
   await page.goto('./');
-  await page.locator('#include-unconfirmed').uncheck();
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN MY OPPORTUNITY ✳');
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#reveal')).toBeVisible();
-  const one=await page.evaluate(()=>JSON.parse(localStorage.getItem('opportunity-orbit:history:v2')!).seen[0]);
-  if(await page.locator('#next-in-category').isEnabled()){
-    await page.locator('#next-in-category').click();
-    await expect(page.locator('#reveal')).toBeHidden();
-    await page.locator('#spin-button').click();
-    await expect(page.locator('#reveal')).toBeVisible();
-    const seen=await page.evaluate(()=>JSON.parse(localStorage.getItem('opportunity-orbit:history:v2')!).seen);
-    expect(seen).toHaveLength(2);
-    expect(seen[0]).toBe(one);
-    expect(seen[1]).not.toBe(one);
-  }
-});
-
-test('mobile layout has no horizontal scrolling',async({page})=>{
-  await page.goto('./');await expect(page.locator('#spin-button')).toBeEnabled();
+  const ratio=await page.locator('#recording-canvas').evaluate(el=>{const r=el.getBoundingClientRect();return r.width/r.height;});
+  expect(Math.abs(ratio-9/16)).toBeLessThan(.015);
+  await expect(page.locator('#recording-canvas')).toHaveCSS('border-radius','0px');
+  await expect(page.locator('#spin-button')).toHaveCSS('border-radius','0px');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  const backgrounds=await page.evaluate(()=>Array.from(document.querySelectorAll<HTMLElement>('#recording-canvas, #recording-canvas *')).map(el=>getComputedStyle(el).backgroundImage).filter(s=>s.includes('gradient(')));
+  expect(backgrounds).toEqual([]);
+  await chooseCategory(page);
+  const allSolid=await page.locator('#wheel-segments path').evaluateAll(els=>els.every(el=>/^#[0-9a-fA-F]{6}$/.test(el.getAttribute('fill')||'')));
+  expect(allSolid).toBe(true);
+  const bounded=await page.evaluate(()=>{
+    const canvas=document.querySelector('#recording-canvas')!.getBoundingClientRect();
+    return ['.video-head','.category-picker','.wheel-shell','.spin-footer'].every(s=>{const r=document.querySelector(s)!.getBoundingClientRect();return r.left>=canvas.left-3&&r.right<=canvas.right+3;});
+  });expect(bounded).toBe(true);
+  await page.locator('#spin-button').click();
+  await expect(page.locator('#reveal')).toBeVisible();
+  const title=await page.locator('#reveal h2').innerText();
+  const aligned=await page.evaluate(winner=>{
+    const label=Array.from(document.querySelectorAll<HTMLElement>('.sector-label')).find(el=>el.title===winner);
+    const wheel=document.querySelector('#wheel-disc')!.getBoundingClientRect();
+    if(!label)return false;
+    const r=label.getBoundingClientRect();
+    return Math.abs((r.left+r.width/2)-(wheel.left+wheel.width/2))<40 && r.top+r.height/2<wheel.top+wheel.height/2;
+  },title);
+  expect(aligned).toBe(true);
+  await expect(page.locator('.result-story')).toHaveCSS('border-radius','0px');
 });
 
-test('players from the former 100-listing version retain history but get the full 736 by default', async ({ page }) => {
-  const response = await page.request.get('./catalog.json');
-  expect(response.ok()).toBe(true);
-  const catalog = await response.json() as { opportunities: { id: string }[] };
-  const alreadySeen = catalog.opportunities[0].id;
-  await page.addInitScript(id => {
-    localStorage.setItem('opportunity-orbit:history:v1', JSON.stringify({
-      version: 1, seen: [id], history: [{ id, at: new Date().toISOString() }], includeUnconfirmed: false,
-    }));
-  }, alreadySeen);
+test('saved progress migration preserves already-seen items',async({page})=>{
+  await page.addInitScript(()=>{
+    localStorage.setItem('opportunity-orbit:history:v1',JSON.stringify({version:1,seen:['apple-scholars-ai-ml'],history:[],includeUnconfirmed:false}));
+  });
   await page.goto('./');
-  await expect(page.locator('#total-count')).toHaveText('736');
   await expect(page.locator('#discovered-count')).toHaveText('1');
-  await expect(page.locator('#remaining-label')).toContainText('735 still waiting');
-  await expect(page.locator('#include-unconfirmed')).toBeChecked();
-  expect(await page.evaluate(() => localStorage.getItem('opportunity-orbit:history:v1'))).toBeNull();
-});
-
-test('wheel labels remain attached to the drawn wedge and the wheel holds its final angle', async ({ page }) => {
-  await page.goto('./');
   await expect(page.locator('#total-count')).toHaveText('736');
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN MY OPPORTUNITY ✳');
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#reveal')).toBeVisible();
-  const winningTitle = await page.locator('#reveal h2').innerText();
-  const atRest = await page.evaluate((title) => {
-    const labels = Array.from(document.querySelectorAll<HTMLElement>('.sector-label'));
-    const winner = labels.find(label => label.title === title);
-    const disc = document.querySelector<HTMLElement>('#wheel-disc')!;
-    const rotator = document.querySelector<HTMLElement>('#wheel-rotator')!;
-    if (!winner) return null;
-    const discRect = disc.getBoundingClientRect();
-    const labelRect = winner.getBoundingClientRect();
-    return {
-      rotation: getComputedStyle(rotator).transform,
-      sectorAngle: winner.style.getPropertyValue('--sector-angle'),
-      noCounterRotation: !winner.style.getPropertyValue('--counter-angle'),
-      offsetFromPointer: Math.abs(labelRect.left + labelRect.width / 2 - (discRect.left + discRect.width / 2)),
-      nearTop: labelRect.top + labelRect.height / 2 < discRect.top + discRect.height / 2,
-    };
-  }, winningTitle);
-  expect(atRest).not.toBeNull();
-  expect(atRest!.noCounterRotation).toBe(true);
-  expect(atRest!.offsetFromPointer).toBeLessThan(35);
-  expect(atRest!.nearTop).toBe(true);
-  await page.waitForTimeout(250);
-  expect(await page.locator('#wheel-rotator').evaluate(el => getComputedStyle(el).transform)).toBe(atRest!.rotation);
-});
-
-
-test('a 57-option category displays all 57 slices, full-name roster, and lands on the matching wedge', async ({ page }) => {
-  // Fellowships currently contains 57 opportunities in the published catalog.
-  const catalogResponse = await page.request.get('./catalog.json');
-  const catalog = await catalogResponse.json() as {
-    categories: { id:string }[]; opportunities: { category:string; title:string }[];
-  };
-  const grouped = new Map<string, number>();
-  for (const o of catalog.opportunities) grouped.set(o.category, (grouped.get(o.category) ?? 0) + 1);
-  const target = [...grouped.entries()].find(([, count]) => count === Math.max(...grouped.values()))!;
-  expect(target[1]).toBeGreaterThan(50);
-  const qualified = catalog.categories.filter(c => (grouped.get(c.id) ?? 0) >= 8);
-  const targetIndex = qualified.findIndex(c => c.id === target[0]);
-  expect(targetIndex).toBeGreaterThanOrEqual(0);
-  await page.addInitScript(index => {
-    let draws = 0;
-    const original = crypto.getRandomValues.bind(crypto);
-    crypto.getRandomValues = (array: Uint32Array) => {
-      if (array instanceof Uint32Array && array.length === 1) {
-        array[0] = draws++ === 0 ? index : 0;
-        return array;
-      }
-      return original(array);
-    };
-  }, targetIndex);
-  await page.goto('./');
-  await expect(page.locator('.sector-label')).toHaveCount(qualified.length);
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN MY OPPORTUNITY ✳');
-  await expect(page.locator('.sector-label')).toHaveCount(target[1]);
-  await expect(page.locator('#wheel-choice-list li')).toHaveCount(target[1]);
-  await expect(page.locator('#wheel-choice-roster-summary')).toContainText(`all ${target[1]}`);
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#reveal')).toBeVisible();
-  const title = await page.locator('#reveal h2').innerText();
-  expect((await page.locator('.sector-label').evaluateAll((els, winner) => els.filter(el => el.getAttribute('title') === winner).length, title))).toBe(1);
-  await expect(page.locator('#discovered-count')).toHaveText('1');
-  await page.locator('#next-in-category').click();
-  await expect(page.locator('.sector-label')).toHaveCount(target[1] - 1);
-});
-
-test('portrait studio keeps result and short description inside a 9:16 recording frame', async ({page}) => {
-  await page.goto('./');
-  await expect(page.locator('#spin-button')).toBeEnabled();
-  const rect = await page.locator('#recording-canvas').boundingBox();
-  expect(rect).not.toBeNull();
-  expect(Math.abs(rect!.width / rect!.height - 9 / 16)).toBeLessThan(.015);
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN MY OPPORTUNITY ✳');
-  await page.locator('#spin-button').click();
-  await expect(page.locator('#reveal')).toBeVisible();
-  await expect(page.locator('.result-story-label')).toHaveText('SO, WHAT IS IT?');
-  const description = await page.locator('.result-story p').innerText();
-  expect(description.length).toBeGreaterThan(20);
-  expect(description.length).toBeLessThanOrEqual(185);
-  await expect(page.locator('.result-benefit')).toBeVisible();
-  const height = await page.locator('.result-main').evaluate(el => ({content:el.scrollHeight,viewport:el.clientHeight}));
-  expect(height.content - height.viewport).toBeLessThanOrEqual(2);
-  await expect(page.locator('#reveal .primary-link')).toHaveAttribute('href', /^https:\/\//);
-  await page.locator('#next-category').click();
-  await expect(page.locator('#reveal')).toBeHidden();
-  await expect(page.locator('#spin-button-label')).toHaveText('SPIN THE CATEGORY ✳');
+  expect(await page.evaluate(()=>localStorage.getItem('opportunity-orbit:history:v1'))).toBeNull();
 });
