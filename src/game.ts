@@ -11,7 +11,7 @@ export type Catalog = {
 export type HistoryItem = { id: string; at: string };
 export type SavedState = { version: 1; seen: string[]; history: HistoryItem[]; includeUnconfirmed: boolean };
 
-export const emptyState = (): SavedState => ({ version: 1, seen: [], history: [], includeUnconfirmed: false });
+export const emptyState = (): SavedState => ({ version: 1, seen: [], history: [], includeUnconfirmed: true });
 
 export function normalizeState(input: unknown): SavedState {
   if (!input || typeof input !== 'object') return emptyState();

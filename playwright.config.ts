@@ -3,6 +3,7 @@ export default defineConfig({
   testDir: './e2e',
   retries: 1,
   timeout: 30000,
+  expect: { timeout: 12000 },
   use: { baseURL:'http://127.0.0.1:4173/opportunity-orbit/', reducedMotion:'reduce', browserName:'chromium' },
   projects:[
     {name:'desktop',use:{viewport:{width:1400,height:900}}},

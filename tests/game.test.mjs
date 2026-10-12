@@ -7,16 +7,16 @@ const catalog = { categories: [{ id: 'a', label: 'A' },{ id:'b',label:'B' }], op
   {id:'three',category:'b',status:'active'},
 ]};
 
-test('only confirmed listings enter the default pool; opt-in permits unconfirmed',()=>{
-  assert.deepEqual(pool(catalog,emptyState()).map(o=>o.id),['one','three']);
-  assert.deepEqual(pool(catalog,{...emptyState(),includeUnconfirmed:true}).map(o=>o.id),['one','two','three']);
+test('all eligible listings enter the default pool; optional filter limits to confirmed',()=>{
+  assert.deepEqual(pool(catalog,emptyState()).map(o=>o.id),['one','two','three']);
+  assert.deepEqual(pool(catalog,{...emptyState(),includeUnconfirmed:false}).map(o=>o.id),['one','three']);
 });
 test('selected opportunity never occurs again, including after rehydration',()=>{
   let state=recordWin(emptyState(),'one','2026-10-12');
   assert.equal(recordWin(state,'one'),state);
   state=normalizeState(JSON.parse(JSON.stringify(state)));
-  assert.deepEqual(pool(catalog,state).map(o=>o.id),['three']);
-  assert.deepEqual(availableCategories(catalog,pool(catalog,state)).map(c=>c.id),['b']);
+  assert.deepEqual(pool(catalog,state).map(o=>o.id),['two','three']);
+  assert.deepEqual(availableCategories(catalog,pool(catalog,state)).map(c=>c.id),['a','b']);
 });
 test('an opportunity selected from any position ends in the preview exactly once',()=>{
   const values=Array.from({length:70},(_,i)=>i);
