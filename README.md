@@ -4,18 +4,19 @@ A short-form-video-ready **9:16 portrait spin studio** powered by the [PerkCommo
 
 **Live site:** https://codwastaken.github.io/opportunity-orbit/
 
-## Record a vertical short-form video
+## Record a pastel short-form video
 
-The main experience is a vertical 9:16 frame designed for mobile screen recording. Spin a category, then an opportunity. The result appears in the same frame with a source-grounded description excerpt, the stated benefit, links, and a clear status caveat. The **Full screen** control is outside the frame. Filters, history, and the complete wheel-choice list are also below the recording frame so they do not clutter videos. Video recording and uploading are left to your device.
+The recording experience has a **square-edged, flat pastel 9:16 frame** and a one-spin flow:
 
-## How it works
+1. Select your category using the scrollable pastel tiles, or use **ALL CATEGORIES** for the complete category grid.
+2. The opportunity wheel displays **every remaining listing in that category**, one solid pastel SVG slice each. Tap **SPIN MY OPPORTUNITY**.
+3. A large result poster shows the title, provider, short source-grounded description, listed benefit, and links to the provider and PerkCommons. Unconfirmed listings remain clearly marked.
 
-- Spin 1 uniformly chooses among categories with **at least eight currently unspun opportunities**. Smaller categories do not appear. With the current 736-entry catalog, this leaves 18 of 20 categories on the first wheel (731 listings in the selectable categories; the other 5 are still in the source catalog). A category drops off future category spins as soon as its remaining count falls below eight.
-- Spin 2 uniformly chooses among **all** currently eligible, unspun opportunities in the selected category. If you stay in that category, you can keep drawing even after fewer than eight remain.
-- **Every selectable option is a wheel segment**, both for categories and individual opportunities. No preview, hidden candidates, or rerandomized slices. Segment labels rotate radially with the wheel; long titles are compacted to fit, and the expandable full-name list directly beneath the wheel shows **every full title in wheel order**. The pointer selects a segment from that complete set.
-- The chosen opportunity is saved to first-party `localStorage` and permanently excluded from future spins **on that browser**, including across reloads. Browsers/devices do not share histories. Private browsing/storage clearing or **Reset history** allows repeats again.
-- You may spin again in the same category or start with a fresh category spin. If you leave a category with fewer than eight remaining results, it will no longer be available on the category wheel unless data or history changes. The underlying 736 records are still available in the source dataset.
-- By default the draw includes all **736 eligible listings**, including 636 marked `unconfirmed`. The optional toggle lets you narrow to 100 active listings. Unconfirmed results include explicit warnings and provider links. General products, unrelated resources, and disputed/expired records remain excluded.
+The wheel does not choose your category for you. Only categories with at least eight undrawn results appear in the selector; once selected, the remaining entries may still be played down to zero. The dataset remains 736 eligible entries, including unconfirmed listings, and the minimum-eight rule currently makes 18 categories containing 731 entries initially selectable.
+
+Pastel lavender, cream, peach, mint, butter yellow and sky blue replace dark gradients. All video-frame edges, buttons and cards are square. Every wheel slice uses a solid SVG fill, no gradient, and its label stays attached to that slice as it rotates.
+
+Your draw history persists locally in this browser and prevents repeated opportunities until Reset. No login, cookies, or analytics are needed. You can use your phone's screen recorder to capture the vertical frame. This website does not record or upload video.
 
 ## Data and updates
 
