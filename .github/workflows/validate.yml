@@ -1,0 +1,27 @@
+name: Validate Opportunity Orbit
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: PerkCommons/data
+          path: _source_data
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          DATA_REPO_PATH: _source_data
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
