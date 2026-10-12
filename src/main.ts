@@ -3,7 +3,8 @@ import { availableCategories, draw, emptyState, normalizeState, pool, recordWin,
 import type { Catalog, Category, Opportunity, SavedState } from './game';
 
 const ROOT = document.querySelector<HTMLDivElement>('#app')!;
-const STORAGE = 'opportunity-orbit:history:v1';
+const STORAGE = 'opportunity-orbit:history:v2';
+const OLD_STORAGE = 'opportunity-orbit:history:v1';
 const BASE = import.meta.env.BASE_URL;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let catalog: Catalog;
@@ -18,8 +19,21 @@ const selectedWheelColors = ['#C9C0FF','#AEF09A','#FFBAAC','#9DDDEA','#FFDFA4','
 
 const escape = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]!);
 function loadState(): SavedState {
-  try { return normalizeState(JSON.parse(localStorage.getItem(STORAGE) || 'null')); }
-  catch { canPersist = false; return emptyState(); }
+  try {
+    const current = localStorage.getItem(STORAGE);
+    if (current !== null) return normalizeState(JSON.parse(current));
+    // Migrate past players to the full-catalog default while preserving their
+    // already-drawn IDs. The old 100-only filter should never silently persist.
+    const previous = localStorage.getItem(OLD_STORAGE);
+    if (previous !== null) {
+      const old = normalizeState(JSON.parse(previous));
+      const migrated = { ...old, includeUnconfirmed: true };
+      localStorage.setItem(STORAGE, JSON.stringify(migrated));
+      localStorage.removeItem(OLD_STORAGE);
+      return migrated;
+    }
+    return emptyState();
+  } catch { canPersist = false; return emptyState(); }
 }
 function persist(): void {
   try { localStorage.setItem(STORAGE, JSON.stringify(saved)); }
@@ -63,8 +77,8 @@ function shell(): void {
           <div class="side-header"><span>YOUR EXPEDITION</span><span class="small-star">✳</span></div>
           <section class="progress-card"><span class="overline">THE ADVENTURE SO FAR</span><div class="big-number"><span id="discovered-count">0</span><span class="metric-suffix"> / <span id="total-count">—</span></span></div><p>Opportunities discovered</p><div class="progress-track"><div id="progress-bar"></div></div><div class="progress-bottom"><span id="remaining-label">Loading pool…</span><span id="percent-label">0%</span></div></section>
           <section class="settings-card"><div class="settings-title">YOUR SPIN SETTINGS <span>⚙</span></div>
-            <label class="switch-row" for="include-unconfirmed"><span><strong>Include unconfirmed</strong><small>More variety; always check details with the provider.</small></span><input type="checkbox" id="include-unconfirmed" role="switch"/><span class="toggle-track"></span></label>
-            <div class="source-note">Only opportunity listings are included. Expired, disputed, and excluded general resources are left out.</div>
+            <label class="switch-row" for="include-unconfirmed"><span><strong>Use the full catalog</strong><small>Includes unconfirmed opportunities. Check the provider before applying.</small></span><input type="checkbox" id="include-unconfirmed" role="switch"/><span class="toggle-track"></span></label>
+            <div class="source-note">Includes all eligible opportunity records by default, even if their status is unconfirmed. Expired and excluded resources stay out.</div>
           </section>
           <section class="history-card"><div class="history-title"><span>RECENT DISCOVERIES</span><button type="button" id="reset-button">Reset history ↺</button></div><div id="history-list" class="history-list"><p class="empty-history">Nothing found just yet. Your adventure is about to begin.</p></div></section>
           <div class="privacy-card"><span aria-hidden="true">◇</span> Your spin history stays in this browser. No account, cookies, or analytics required.</div>
@@ -89,7 +103,9 @@ function paintWheel(choices: Array<{ label: string; short: string }>): void {
   const labels = $('#wheel-labels');
   const n = Math.max(choices.length, 1); const sector = 360/n;
   disc.style.background = `conic-gradient(from 0deg, ${choices.map((_,i) => `${selectedWheelColors[i % selectedWheelColors.length]} ${i*sector}deg ${(i+1)*sector}deg`).join(', ')})`;
-  labels.innerHTML = choices.map((o,i)=>`<span class="sector-label" style="--sector-angle:${(i+.5)*sector}deg; --counter-angle:${-(i+.5)*sector}deg" title="${escape(o.label)}">${escape(o.short)}</span>`).join('');
+  // A label is fixed to the midpoint of its own sector. The parent disc and
+  // every label share exactly the same wheel rotation; no counter-rotation.
+  labels.innerHTML = choices.map((o,i)=>`<span class="sector-label" style="--sector-angle:${(i+.5)*sector}deg" title="${escape(o.label)}">${escape(o.short)}</span>`).join('');
   const rotator = $('#wheel-rotator');rotator.style.transition = 'none';rotator.style.transform = 'rotate(0deg)';rotation = 0;
 }
 function previewForCategory(categories: Category[]): void {
@@ -109,7 +125,7 @@ function historyMarkup(): string {
   if (!items.length) return '<p class="empty-history">Nothing found just yet. Your adventure is about to begin.</p>';
   return items.map((h,index)=>{const o=byId.get(h.id)!;return `<a class="history-item" href="https://perkcommons.com/opportunities/${encodeURIComponent(o.id)}/" target="_blank" rel="noopener noreferrer"><span class="history-index">${String(index+1).padStart(2,'0')}</span><span><strong>${escape(o.title)}</strong><small>${escape(o.provider)}</small></span><span class="history-arrow">↗</span></a>`;}).join('');
 }
-function render(): void {
+function render(preserveWheel = false): void {
   const remaining = available();const categories = availableCategories(catalog,remaining);
   const eligibleTotal = catalog.opportunities.filter(o => saved.includeUnconfirmed || o.status !== 'unconfirmed').length;
   const usedEligible = eligibleTotal-remaining.length;
@@ -130,17 +146,17 @@ function render(): void {
   const reveal=$('#reveal');reveal.hidden=!latestResult;
   if (phase==='category') {
     $('#spin-title').textContent='First, a category.';
-    $('#spin-subtitle').textContent = remaining.length ? `${number(categories.length)} possible categories · wheel previews ${Math.min(8,categories.length)}. All have equal odds.` : 'You have explored every available opportunity!';
+    $('#spin-subtitle').textContent = remaining.length ? `${number(categories.length)} categories available from ${number(remaining.length)} opportunities · ${Math.min(8,categories.length)} shown per spin.` : 'You have explored every available opportunity!';
     $('#spin-button-label').textContent = remaining.length ? 'SPIN THE CATEGORY' : 'ALL OPPORTUNITIES DISCOVERED';
     button.disabled = spinning || !remaining.length;
-    if(!spinning) previewForCategory(categories);
+    if(!spinning && !preserveWheel) previewForCategory(categories);
   } else {
     const here=remaining.filter(o=>o.category===currentCategory?.id);
     $('#spin-title').textContent=currentCategory?.label || 'Next, an opportunity.';
-    $('#spin-subtitle').textContent = here.length ? `${number(here.length)} undiscovered · wheel previews ${Math.min(8,here.length)}. All have equal odds.` : 'That category is fully explored. Pick another!';
+    $('#spin-subtitle').textContent = here.length ? here.length === 1 ? 'This category has one remaining opportunity, so it will be the result.' : `${number(here.length)} undiscovered in this category · ${Math.min(8,here.length)} on the wheel.` : 'That category is fully explored. Pick another!';
     $('#spin-button-label').textContent = here.length ? 'SPIN AN OPPORTUNITY' : 'CATEGORY COMPLETED';
     button.disabled = spinning || !here.length;
-    if(!spinning) previewForOpportunity(here);
+    if(!spinning && !preserveWheel) previewForOpportunity(here);
   }
   if(latestResult) reveal.innerHTML = resultMarkup(latestResult);
   if(!canPersist) $('#remaining-label').textContent += ' · session only';
@@ -177,6 +193,8 @@ async function spin(): Promise<void> {
     rotation+=degrees;rotator.style.transform=`rotate(${rotation}deg)`;
     setTimeout(resolve,reduceMotion.matches?45:4570);
   })));
+  // Let the pointer settle over the drawn wedge before swapping the wheel.
+  if (wasCategory && !reduceMotion.matches) await new Promise<void>(resolve => setTimeout(resolve, 1100));
   spinning=false;
   if(wasCategory && 'label' in outcome.winner) {
     currentCategory=outcome.winner;phase='opportunity';
@@ -186,7 +204,9 @@ async function spin(): Promise<void> {
     latestResult=outcome.winner;
     saved=recordWin(saved,latestResult.id);persist();
   }
-  render();
+  // Keep the winning opportunity and its label precisely under the pointer
+  // until the user starts the next draw; never snap back immediately.
+  render(!wasCategory);
   if(latestResult) {wireResult();$('#reveal').scrollIntoView({behavior:reduceMotion.matches?'instant':'smooth',block:'start'});}
 }
 function fatal(message: string): void {

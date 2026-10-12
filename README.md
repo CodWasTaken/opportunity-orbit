@@ -11,7 +11,7 @@ An independent, playful spin-the-wheel project powered by the [PerkCommons publi
 - To keep the labels readable, the wheel visually displays up to eight sampled candidates **including the already-uniformly-drawn winner**. The shortlist is not the selection pool; every eligible entry still has the same chance of being chosen.
 - The chosen opportunity is saved to first-party `localStorage` and permanently excluded from future spins **on that browser**, including across reloads. Browsers/devices do not share histories. Private browsing/storage clearing or **Reset history** allows repeats again.
 - You may spin again in the same category or start with a fresh category spin. A depleted category disappears automatically from future spins.
-- By default, only records not marked `unconfirmed` are in the draw. The opt-in toggle includes unconfirmed records with explicit warnings and provider links. General products, unrelated resources, and disputed/expired records remain excluded.
+- By default the draw includes all **736 eligible listings**, including 636 marked `unconfirmed`. The optional toggle lets you narrow to 100 active listings. Unconfirmed results include explicit warnings and provider links. General products, unrelated resources, and disputed/expired records remain excluded.
 
 ## Data and updates
 
