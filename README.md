@@ -1,8 +1,12 @@
 # Opportunity Orbit
 
-An independent, playful spin-the-wheel project powered by the [PerkCommons public dataset](https://github.com/PerkCommons/data). Spin once to choose a category, then spin again to reveal an opportunity from that category. Every opportunity you draw is removed from future spins **in this browser** until you reset your history.
+A short-form-video-ready **9:16 portrait spin studio** powered by the [PerkCommons public dataset](https://github.com/PerkCommons/data). Spin once to choose a category, then spin again to reveal an opportunity from that category. Every opportunity you draw is removed from future spins **in this browser** until you reset your history.
 
 **Live site:** https://codwastaken.github.io/opportunity-orbit/
+
+## Record a vertical short-form video
+
+The main experience is a vertical 9:16 frame designed for mobile screen recording. Spin a category, then an opportunity. The result appears in the same frame with a source-grounded description excerpt, the stated benefit, links, and a clear status caveat. The **Full screen** control is outside the frame. Filters, history, and the complete wheel-choice list are also below the recording frame so they do not clutter videos. Video recording and uploading are left to your device.
 
 ## How it works
 

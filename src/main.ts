@@ -1,6 +1,7 @@
 import './style.css';
 import { availableCategories, draw, emptyState, MIN_CATEGORY_OPTIONS, normalizeState, pool, recordWin, secureIndex } from './game';
 import type { Catalog, Category, Opportunity, SavedState } from './game';
+import { quickSummary } from './summary';
 
 const ROOT = document.querySelector<HTMLDivElement>('#app')!;
 const STORAGE = 'opportunity-orbit:history:v2';
@@ -45,61 +46,47 @@ function $<T extends HTMLElement = HTMLElement>(selector: string): T { const el 
 
 function shell(): void {
   ROOT.innerHTML = `
-    <header class="topbar wrap">
-      <a class="logo" href="${escape(BASE)}" aria-label="Opportunity Orbit home"><span class="logo-symbol" aria-hidden="true">✳</span><span>opportunity<span class="logo-accent">orbit</span><sup>↗</sup></span></a>
-      <nav class="topnav" aria-label="External resources">
-        <a href="https://github.com/PerkCommons/data" target="_blank" rel="noopener noreferrer">The open data <span aria-hidden="true">↗</span></a>
-        <a class="github-link" href="https://github.com/CodWasTaken/opportunity-orbit" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-      </nav>
-    </header>
-    <main class="wrap">
-      <section class="hero">
-        <div class="hero-copy"><span class="eyebrow"><i></i> YOUR NEXT THING STARTS HERE</span>
-          <h1>A little luck.<br/><em>A big possibility.</em></h1>
-          <p>Don't know what opportunity to explore next? Spin for a category, then let the universe pick an opportunity for you. Every discovery is a one-time find.</p>
-        </div>
-        <div class="hero-sticker" aria-hidden="true"><span>FIND YOUR<br/>NEXT BIG</span><strong>WHAT IF?</strong><div>↗</div></div>
+    <main class="studio-layout">
+      <div class="studio-topbar"><a class="top-brand" href="${escape(BASE)}"><span class="mini-mark">✳</span> opportunity<span>orbit</span></a><span class="creator-badge"><i></i> VERTICAL SPIN STUDIO</span></div>
+      <section id="recording-canvas" class="recording-canvas" aria-label="Vertical opportunity spin stage">
+        <div class="canvas-glow glow-one" aria-hidden="true"></div><div class="canvas-glow glow-two" aria-hidden="true"></div>
+        <div class="video-topline"><div class="in-video-brand"><span class="in-video-mark">✳</span><span>opportunity<strong>orbit</strong></span></div><span class="episode-pill">EP. <span id="episode-count">001</span></span></div>
+        <div class="video-head"><div class="kicker"><span class="kicker-dot"></span> YOUR RANDOM OPPORTUNITY GENERATOR</div><h1 id="video-headline">YOUR NEXT<br><em>BIG THING?</em></h1><div id="video-subhead">TWO SPINS. ONE NEW POSSIBILITY.</div></div>
+        <div class="round-indicator" aria-label="Current wheel"><div id="stage-one" class="stage current"><b>01</b> CATEGORY</div><span class="divider-arrow">→</span><div id="stage-two" class="stage"><b>02</b> OPPORTUNITY</div></div>
+        <div class="wheel-bay"><div class="wheel-shell" id="wheel-shell"><div class="wheel-halo"></div><div class="wheel-pointer" aria-hidden="true"></div><div id="wheel-rotator" class="wheel-rotator"><div id="wheel-disc" class="wheel-disc"><div class="wheel-core"><div class="wheel-core-ring">✳</div></div><div id="wheel-labels"></div></div></div></div></div>
+        <div class="spin-footer"><div class="spin-title" id="spin-title">Let's find your category.</div><p id="spin-subtitle">18 categories waiting for a spin</p><button type="button" id="spin-button" class="spin-button" disabled><span id="spin-button-label">LOADING…</span><span class="button-arrow" aria-hidden="true">↗</span></button><button type="button" id="switch-button" class="switch-button" hidden>← Back to categories</button></div>
+        <div class="video-bottomline"><span>POWERED BY PERKCOMMONS OPEN DATA</span><span class="video-spark" aria-hidden="true">✳</span><span>NO REPEATS · EVER</span></div>
+        <section id="reveal" class="reveal" hidden aria-live="polite" aria-label="Your random opportunity result"></section>
       </section>
-      <section class="playground" aria-label="Opportunity spinner">
-        <div class="spinner-panel">
-          <div class="panel-top"><div class="step-count">THE DISCOVERY MACHINE <span> / 001</span></div><span class="live-pill"><span></span> READY TO EXPLORE</span></div>
-          <div class="stage-toggle" aria-label="Steps"><div id="stage-one" class="stage current"><span>01</span> PICK A CATEGORY</div><div class="stage-separator">→</div><div id="stage-two" class="stage"><span>02</span> DISCOVER A FIND</div></div>
-          <div class="wheel-shell" id="wheel-shell">
-            <div class="wheel-halo"></div><div class="wheel-pointer" aria-hidden="true"></div>
-            <div id="wheel-rotator" class="wheel-rotator"><div id="wheel-disc" class="wheel-disc"><div class="wheel-core"><div class="wheel-core-ring">✳</div></div><div id="wheel-labels"></div></div></div>
-          </div>
-          <details id="wheel-choice-roster" class="wheel-choice-roster">
-            <summary id="wheel-choice-roster-summary">See every slice on the wheel</summary>
-            <ol id="wheel-choice-list" class="wheel-choice-list" aria-label="Full names of the slices in wheel order"></ol>
-          </details>
-          <div class="spin-footer"><div class="spin-title" id="spin-title">First, a category.</div><p id="spin-subtitle">One spin. Endless possibilities.</p>
-            <button type="button" id="spin-button" class="spin-button" disabled><span id="spin-button-label">Loading opportunities…</span><span class="button-arrow" aria-hidden="true">↗</span></button>
-            <button type="button" id="switch-button" class="switch-button" hidden>← Choose a different category</button>
-          </div>
+      <div class="studio-actionbar"><div><strong>Made for short-form video.</strong><span>A 9:16 frame you can screen-record.</span></div><button id="fullscreen-button" class="fullscreen-button" type="button">⛶ Full screen</button></div>
+      <section class="control-deck" aria-label="Wheel settings and history">
+        <div class="control-top"><span class="control-eyebrow">BEHIND THE SPIN</span><span class="control-caption">All the controls. None of the camera clutter.</span></div>
+        <div class="control-grid">
+          <section class="progress-card"><span class="overline">YOUR DISCOVERIES</span><div class="big-number"><span id="discovered-count">0</span><span class="metric-suffix"> / <span id="total-count">—</span></span></div><p>Opportunities discovered</p><div class="progress-track"><div id="progress-bar"></div></div><div class="progress-bottom"><span id="remaining-label">Loading pool…</span><span id="percent-label">0%</span></div></section>
+          <section class="settings-card"><div class="settings-title">YOUR SPIN SETTINGS <span>✳</span></div><label class="switch-row" for="include-unconfirmed"><span><strong>Use the full catalog</strong><small>Includes unconfirmed listings. Confirm details with the provider.</small></span><input type="checkbox" id="include-unconfirmed" role="switch"/><span class="toggle-track"></span></label><p class="source-note">The category wheel only offers categories with at least eight unspun results. Every listing in a selected category has its own slice.</p></section>
         </div>
-        <aside class="side-panel">
-          <div class="side-header"><span>YOUR EXPEDITION</span><span class="small-star">✳</span></div>
-          <section class="progress-card"><span class="overline">THE ADVENTURE SO FAR</span><div class="big-number"><span id="discovered-count">0</span><span class="metric-suffix"> / <span id="total-count">—</span></span></div><p>Opportunities discovered</p><div class="progress-track"><div id="progress-bar"></div></div><div class="progress-bottom"><span id="remaining-label">Loading pool…</span><span id="percent-label">0%</span></div></section>
-          <section class="settings-card"><div class="settings-title">YOUR SPIN SETTINGS <span>⚙</span></div>
-            <label class="switch-row" for="include-unconfirmed"><span><strong>Use the full catalog</strong><small>Includes unconfirmed opportunities. Check the provider before applying.</small></span><input type="checkbox" id="include-unconfirmed" role="switch"/><span class="toggle-track"></span></label>
-            <div class="source-note">Only categories with eight or more unspun opportunities appear on the first wheel. Smaller categories remain in the source catalog but cannot be chosen. Each selected category displays every remaining slice.</div>
-          </section>
-          <section class="history-card"><div class="history-title"><span>RECENT DISCOVERIES</span><button type="button" id="reset-button">Reset history ↺</button></div><div id="history-list" class="history-list"><p class="empty-history">Nothing found just yet. Your adventure is about to begin.</p></div></section>
-          <div class="privacy-card"><span aria-hidden="true">◇</span> Your spin history stays in this browser. No account, cookies, or analytics required.</div>
-        </aside>
+        <details id="wheel-choice-roster" class="wheel-choice-roster"><summary id="wheel-choice-roster-summary">See all wheel choices</summary><ol id="wheel-choice-list" class="wheel-choice-list" aria-label="Full names of the slices in wheel order"></ol></details>
+        <section class="history-card"><div class="history-title"><span>YOUR RECENT FINDS</span><button type="button" id="reset-button">Reset history ↺</button></div><div id="history-list" class="history-list"><p class="empty-history">No opportunities discovered yet. Your adventure starts with a spin.</p></div></section>
+        <p class="privacy-card">Your results are saved only in this browser. PerkCommons listings may be unconfirmed or out of date. Check the provider before applying.</p>
       </section>
-      <section id="reveal" class="reveal" hidden aria-live="polite"></section>
-      <section class="how-it-works"><div class="section-heading"><span>THE RULES ARE SIMPLE</span><h2>Discover. Explore. Repeat.</h2></div><div class="how-grid"><article><span>01 /</span><h3>Spin a category</h3><p>Explore categories with at least eight remaining opportunities. Smaller categories stay out of the draw.</p></article><article><span>02 /</span><h3>Meet your opportunity</h3><p>Spin again to reveal a random listing, then check its official source and eligibility.</p></article><article><span>03 /</span><h3>No repeats. Ever.*</h3><p>Once drawn, an opportunity is removed from future spins on this browser until you reset your history.</p></article></div><p class="footnote">* Unless you reset progress or clear your browser's site storage. New items arrive when the open dataset refreshes.</p></section>
+      <footer class="creator-footer"><a href="https://perkcommons.com/" target="_blank" rel="noopener noreferrer">Explore PerkCommons ↗</a><a href="https://github.com/CodWasTaken/opportunity-orbit" target="_blank" rel="noopener noreferrer">Open-source project ↗</a><span>No logins. No analytics.</span></footer>
     </main>
-    <footer class="footer"><div class="wrap footer-inner"><div class="footer-brand">✳ <strong>opportunityorbit</strong><span>A little chaos for a good cause.</span></div><p>An independent experiment using <a href="https://github.com/PerkCommons/data" target="_blank" rel="noopener noreferrer">PerkCommons CC0 open data ↗</a>. Listings are not guarantees of availability or eligibility.</p><div class="footer-links"><a href="https://perkcommons.com/" target="_blank" rel="noopener noreferrer">Explore PerkCommons ↗</a><a href="https://github.com/CodWasTaken/opportunity-orbit" target="_blank" rel="noopener noreferrer">Source code ↗</a></div></div></footer>
-    <dialog id="reset-dialog" aria-labelledby="reset-heading"><form method="dialog"><span class="dialog-mark" aria-hidden="true">↺</span><h2 id="reset-heading">Start a fresh orbit?</h2><p>This will clear your discovered opportunities on this browser and put every eligible opportunity back in the wheel.</p><div class="dialog-actions"><button value="cancel" class="dialog-cancel">Keep progress</button><button value="confirm" class="dialog-confirm">Reset everything</button></div></form></dialog>
-  `;
+    <dialog id="reset-dialog" aria-labelledby="reset-heading"><form method="dialog"><div class="dialog-mark">✳</div><h2 id="reset-heading">Fresh start?</h2><p>This puts every eligible opportunity back in the wheel on this browser.</p><div class="dialog-actions"><button value="cancel" class="dialog-cancel">Keep progress</button><button value="confirm" class="dialog-confirm">Reset everything</button></div></form></dialog>`;
   $('#spin-button').addEventListener('click', () => void spin());
   $('#switch-button').addEventListener('click', () => { if (spinning) return; phase = 'category'; currentCategory = null; latestResult = null; render(); });
   $('#include-unconfirmed').addEventListener('change', e => { if (spinning) return; saved.includeUnconfirmed = (e.target as HTMLInputElement).checked; persist(); phase = 'category'; currentCategory = null; latestResult = null; render(); });
-  $('#reset-button').addEventListener('click', () => { if (!spinning) ($<HTMLDialogElement>('#reset-dialog')).showModal(); });
+  $('#reset-button').addEventListener('click', () => { if (!spinning) $<HTMLDialogElement>('#reset-dialog').showModal(); });
   $('#reset-dialog').addEventListener('close', () => { if ($<HTMLDialogElement>('#reset-dialog').returnValue === 'confirm') { saved = { ...emptyState(), includeUnconfirmed: saved.includeUnconfirmed }; persist(); phase = 'category'; currentCategory = null; latestResult = null; render(); } });
+  $('#fullscreen-button').addEventListener('click', async () => {
+    const frame = $('#recording-canvas');
+    try {
+      if (document.fullscreenElement === frame) await document.exitFullscreen();
+      else if (frame.requestFullscreen) await frame.requestFullscreen();
+    } catch { $<HTMLButtonElement>('#fullscreen-button').textContent = 'Full screen unavailable'; }
+  });
+  document.addEventListener('fullscreenchange', () => { $<HTMLButtonElement>('#fullscreen-button').textContent = document.fullscreenElement ? '⛶ Exit full screen' : '⛶ Full screen'; });
 }
+
 function available(): Opportunity[] { return pool(catalog, saved); }
 function sliceLabel(label: string, length = 22): string { return label.length > length ? label.slice(0,length - 1).trimEnd() + '…' : label; }
 type WheelChoice = { label: string; short: string };
@@ -154,6 +141,9 @@ function render(preserveWheel = false): void {
   $('#history-list').innerHTML = historyMarkup();
   const toggle = $<HTMLInputElement>('#include-unconfirmed');toggle.checked = saved.includeUnconfirmed; toggle.disabled=spinning;
   $('#reset-button').toggleAttribute('disabled',spinning||saved.seen.length===0);
+  $('#episode-count').textContent = String(saved.seen.length+1).padStart(3,'0');
+  $('#video-headline').innerHTML = phase === 'category' ? 'YOUR NEXT<br><em>BIG THING?</em>' : 'LET FATE<br><em>DECIDE.</em>';
+  $('#video-subhead').textContent = phase === 'category' ? 'FIRST UP: PICK YOUR CATEGORY' : `ROUND TWO · ${currentCategory?.label.toUpperCase() ?? 'YOUR OPPORTUNITY'}`;
   $('#stage-one').classList.toggle('current',phase==='category');
   $('#stage-two').classList.toggle('current',phase==='opportunity');
   $('#stage-one').classList.toggle('completed',phase==='opportunity');
@@ -161,18 +151,18 @@ function render(preserveWheel = false): void {
   $('#switch-button').hidden=phase!=='opportunity' || spinning;
   const reveal=$('#reveal');reveal.hidden=!latestResult;
   if (phase==='category') {
-    $('#spin-title').textContent='First, a category.';
+    $('#spin-title').textContent='Where will we land?';
     $('#spin-subtitle').textContent = categories.length
-      ? `${number(categories.length)} categories with ${MIN_CATEGORY_OPTIONS}+ remaining options · ${number(categoryWheelOptions)} listings qualify for category spins.`
+      ? `${number(categories.length)} categories · ${number(categoryWheelOptions)} possible discoveries`
       : `No categories have ${MIN_CATEGORY_OPTIONS} remaining options. Try another filter or reset history.`;
-    $('#spin-button-label').textContent = categories.length ? 'SPIN THE CATEGORY' : 'NO ELIGIBLE CATEGORIES';
+    $('#spin-button-label').textContent = categories.length ? 'SPIN THE CATEGORY ✳' : 'NO ELIGIBLE CATEGORIES';
     button.disabled = spinning || !categories.length;
     if(!spinning && !preserveWheel) paintWheel(categoryWheelChoices(categories));
   } else {
     const here=remaining.filter(o=>o.category===currentCategory?.id);
-    $('#spin-title').textContent=currentCategory?.label || 'Next, an opportunity.';
-    $('#spin-subtitle').textContent = here.length ? `${number(here.length)} options left in this category. Every option has its own slice.` : 'That category is fully explored. Pick another!';
-    $('#spin-button-label').textContent = here.length ? 'SPIN AN OPPORTUNITY' : 'CATEGORY COMPLETED';
+    $('#spin-title').textContent=currentCategory?.label || 'Choose your opportunity';
+    $('#spin-subtitle').textContent = here.length ? `${number(here.length)} possible picks · all on the wheel` : 'That category is fully explored. Pick another!';
+    $('#spin-button-label').textContent = here.length ? 'SPIN MY OPPORTUNITY ✳' : 'CATEGORY COMPLETED';
     button.disabled = spinning || !here.length;
     if(!spinning && !preserveWheel) paintWheel(opportunityWheelChoices(here));
   }
@@ -180,15 +170,26 @@ function render(preserveWheel = false): void {
   if(!canPersist) $('#remaining-label').textContent += ' · session only';
 }
 function resultMarkup(o: Opportunity): string {
-  const category=catalog.categories.find(c=>c.id===o.category);
-  const statusWarning=o.status==='unconfirmed';
-  return `<div class="reveal-top"><span><span class="spark">✳</span> OPPORTUNITY UNLOCKED</span><span>#${String(saved.seen.length).padStart(3,'0')}</span></div><div class="reveal-columns"><div><div class="reveal-category">${escape(category?.label||o.category)} <span>↗</span></div><h2>${escape(o.title)}</h2><p class="reveal-provider">By ${escape(o.provider)}</p><p class="reveal-desc">${escape(o.description)}</p></div><div class="reveal-info"><span class="review-chip ${statusWarning?'caution':''}">${statusWarning?'● NOT CONFIRMED':'● '+escape(moneyStatus(o.status).toUpperCase())}</span><div><span class="detail-heading">WHAT IT OFFERS</span><p>${escape(o.value || 'See provider for details.')}</p></div><div><span class="detail-heading">WHO CAN APPLY</span><p>${escape(o.eligibility || 'Check with provider.')}</p></div><p class="review-note">Status reflects the dataset, not a guarantee. Always check current terms, availability and eligibility with the provider.</p><div class="reveal-links"><a href="${escape(o.officialUrl)}" target="_blank" rel="noopener noreferrer" class="primary-link">VISIT THE PROVIDER <span>↗</span></a><a href="https://perkcommons.com/opportunities/${encodeURIComponent(o.id)}/" target="_blank" rel="noopener noreferrer" class="secondary-link">VIEW ON PERKCOMMONS ↗</a></div></div></div><div class="after-spin"><button type="button" id="next-in-category">↻ Spin again in this category</button><button type="button" id="next-category">← New category</button></div>`;
+  const category = catalog.categories.find(c => c.id === o.category);
+  const short = quickSummary(o.description, 185);
+  const benefit = quickSummary(o.value, 108);
+  return `<div class="reveal-flash" aria-hidden="true">✦</div><div class="result-topline"><span>✳ THE UNIVERSE HAS SPOKEN</span><span>FIND #${String(saved.seen.length).padStart(3,'0')}</span></div>
+    <div class="result-main"><div class="result-kicker">YOUR OPPORTUNITY IS…</div><div class="result-category">${escape(category?.label ?? o.category)}</div><h2>${escape(o.title)}</h2><div class="result-provider">BY ${escape(o.provider)}</div>
+      <div class="result-divider"><span>✷</span><span>✷</span><span>✷</span></div>
+      <div class="result-story"><div class="result-story-label">SO, WHAT IS IT?</div><p>${escape(short)}</p></div>
+      ${benefit ? `<div class="result-benefit"><span>THE PERK</span><p>${escape(benefit)}</p></div>` : ''}
+      <div class="result-status ${o.status === 'unconfirmed' ? 'unconfirmed' : ''}">${o.status === 'unconfirmed' ? '◌ STATUS NOT YET CONFIRMED' : '✓ '+escape(moneyStatus(o.status).toUpperCase())}<span>Check current details with the provider.</span></div>
+    </div>
+    <div class="result-bottom"><div class="result-links"><a class="primary-link" href="${escape(o.officialUrl)}" target="_blank" rel="noopener noreferrer">OFFICIAL PROGRAM ↗</a><a class="secondary-link" href="https://perkcommons.com/opportunities/${encodeURIComponent(o.id)}/" target="_blank" rel="noopener noreferrer">PERKCOMMONS ↗</a></div>
+      <div class="after-spin"><button id="next-in-category" type="button">↻ Spin again</button><button id="next-category" type="button">New category →</button></div>
+      <div class="result-watermark">DISCOVER MORE AT <strong>PERKCOMMONS.COM</strong></div></div>`;
 }
+
 function wireResult(): void {
   const nextIn=$<HTMLButtonElement>('#next-in-category');const nextCategory=$<HTMLButtonElement>('#next-category');
   nextIn.disabled = !available().some(o=>o.category===currentCategory?.id);
-  nextIn.addEventListener('click',()=>{ latestResult=null;$('#reveal').hidden=true;render();document.querySelector('.spinner-panel')?.scrollIntoView({behavior:reduceMotion.matches?'instant':'smooth',block:'center'}); });
-  nextCategory.addEventListener('click',()=>{latestResult=null;phase='category';currentCategory=null;render();document.querySelector('.spinner-panel')?.scrollIntoView({behavior:reduceMotion.matches?'instant':'smooth',block:'center'});});
+  nextIn.addEventListener('click',()=>{ latestResult=null;render(); });
+  nextCategory.addEventListener('click',()=>{latestResult=null;phase='category';currentCategory=null;render();});
 }
 async function spin(): Promise<void> {
   if(spinning) return;
@@ -207,12 +208,12 @@ async function spin(): Promise<void> {
   const sector=360/options.length;
   const degrees=360*(5+secureIndex(3))+360-(outcome.winnerIndex+.5)*sector;
   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    rotator.style.transition=reduceMotion.matches?'none':'transform 4.5s cubic-bezier(.13,.82,.13,1)';
+    rotator.style.transition=reduceMotion.matches?'none':'transform 3.8s cubic-bezier(.12,.78,.10,1)';
     rotation+=degrees;rotator.style.transform=`rotate(${rotation}deg)`;
-    setTimeout(resolve,reduceMotion.matches?45:4570);
+    setTimeout(resolve,reduceMotion.matches?45:3870);
   })));
   // Let the pointer settle over the drawn wedge before swapping the wheel.
-  if (wasCategory && !reduceMotion.matches) await new Promise<void>(resolve => setTimeout(resolve, 1100));
+  if (wasCategory && !reduceMotion.matches) await new Promise<void>(resolve => setTimeout(resolve, 680));
   spinning=false;
   if(wasCategory && 'label' in outcome.winner) {
     currentCategory=outcome.winner;phase='opportunity';
@@ -225,7 +226,7 @@ async function spin(): Promise<void> {
   // Keep the winning opportunity and its label precisely under the pointer
   // until the user starts the next draw; never snap back immediately.
   render(!wasCategory);
-  if(latestResult) {wireResult();$('#reveal').scrollIntoView({behavior:reduceMotion.matches?'instant':'smooth',block:'start'});}
+  if(latestResult) wireResult();
 }
 function fatal(message: string): void {
   ROOT.innerHTML=`<main class="load-error"><div class="error-symbol">✳</div><h1>Looks like we drifted off course.</h1><p>${escape(message)}</p><button id="retry">Try again ↻</button><p><a href="https://github.com/PerkCommons/data" target="_blank" rel="noopener noreferrer">Browse the source data ↗</a></p></main>`;
