@@ -1,5 +1,5 @@
 import './style.css';
-import { availableCategories, draw, emptyState, normalizeState, pool, recordWin, secureIndex } from './game';
+import { availableCategories, draw, emptyState, MIN_CATEGORY_OPTIONS, normalizeState, pool, recordWin, secureIndex } from './game';
 import type { Catalog, Category, Opportunity, SavedState } from './game';
 
 const ROOT = document.querySelector<HTMLDivElement>('#app')!;
@@ -64,10 +64,14 @@ function shell(): void {
         <div class="spinner-panel">
           <div class="panel-top"><div class="step-count">THE DISCOVERY MACHINE <span> / 001</span></div><span class="live-pill"><span></span> READY TO EXPLORE</span></div>
           <div class="stage-toggle" aria-label="Steps"><div id="stage-one" class="stage current"><span>01</span> PICK A CATEGORY</div><div class="stage-separator">→</div><div id="stage-two" class="stage"><span>02</span> DISCOVER A FIND</div></div>
-          <div class="wheel-shell">
+          <div class="wheel-shell" id="wheel-shell">
             <div class="wheel-halo"></div><div class="wheel-pointer" aria-hidden="true"></div>
             <div id="wheel-rotator" class="wheel-rotator"><div id="wheel-disc" class="wheel-disc"><div class="wheel-core"><div class="wheel-core-ring">✳</div></div><div id="wheel-labels"></div></div></div>
           </div>
+          <details id="wheel-choice-roster" class="wheel-choice-roster">
+            <summary id="wheel-choice-roster-summary">See every slice on the wheel</summary>
+            <ol id="wheel-choice-list" class="wheel-choice-list" aria-label="Full names of the slices in wheel order"></ol>
+          </details>
           <div class="spin-footer"><div class="spin-title" id="spin-title">First, a category.</div><p id="spin-subtitle">One spin. Endless possibilities.</p>
             <button type="button" id="spin-button" class="spin-button" disabled><span id="spin-button-label">Loading opportunities…</span><span class="button-arrow" aria-hidden="true">↗</span></button>
             <button type="button" id="switch-button" class="switch-button" hidden>← Choose a different category</button>
@@ -78,14 +82,14 @@ function shell(): void {
           <section class="progress-card"><span class="overline">THE ADVENTURE SO FAR</span><div class="big-number"><span id="discovered-count">0</span><span class="metric-suffix"> / <span id="total-count">—</span></span></div><p>Opportunities discovered</p><div class="progress-track"><div id="progress-bar"></div></div><div class="progress-bottom"><span id="remaining-label">Loading pool…</span><span id="percent-label">0%</span></div></section>
           <section class="settings-card"><div class="settings-title">YOUR SPIN SETTINGS <span>⚙</span></div>
             <label class="switch-row" for="include-unconfirmed"><span><strong>Use the full catalog</strong><small>Includes unconfirmed opportunities. Check the provider before applying.</small></span><input type="checkbox" id="include-unconfirmed" role="switch"/><span class="toggle-track"></span></label>
-            <div class="source-note">Includes all eligible opportunity records by default, even if their status is unconfirmed. Expired and excluded resources stay out.</div>
+            <div class="source-note">Only categories with eight or more unspun opportunities appear on the first wheel. Smaller categories remain in the source catalog but cannot be chosen. Each selected category displays every remaining slice.</div>
           </section>
           <section class="history-card"><div class="history-title"><span>RECENT DISCOVERIES</span><button type="button" id="reset-button">Reset history ↺</button></div><div id="history-list" class="history-list"><p class="empty-history">Nothing found just yet. Your adventure is about to begin.</p></div></section>
           <div class="privacy-card"><span aria-hidden="true">◇</span> Your spin history stays in this browser. No account, cookies, or analytics required.</div>
         </aside>
       </section>
       <section id="reveal" class="reveal" hidden aria-live="polite"></section>
-      <section class="how-it-works"><div class="section-heading"><span>THE RULES ARE SIMPLE</span><h2>Discover. Explore. Repeat.</h2></div><div class="how-grid"><article><span>01 /</span><h3>Spin a category</h3><p>Find out whether today is about funding, fellowships, developer tools, or something unexpected.</p></article><article><span>02 /</span><h3>Meet your opportunity</h3><p>Spin again to reveal a random listing, then check its official source and eligibility.</p></article><article><span>03 /</span><h3>No repeats. Ever.*</h3><p>Once drawn, an opportunity is removed from future spins on this browser until you reset your history.</p></article></div><p class="footnote">* Unless you reset progress or clear your browser's site storage. New items arrive when the open dataset refreshes.</p></section>
+      <section class="how-it-works"><div class="section-heading"><span>THE RULES ARE SIMPLE</span><h2>Discover. Explore. Repeat.</h2></div><div class="how-grid"><article><span>01 /</span><h3>Spin a category</h3><p>Explore categories with at least eight remaining opportunities. Smaller categories stay out of the draw.</p></article><article><span>02 /</span><h3>Meet your opportunity</h3><p>Spin again to reveal a random listing, then check its official source and eligibility.</p></article><article><span>03 /</span><h3>No repeats. Ever.*</h3><p>Once drawn, an opportunity is removed from future spins on this browser until you reset your history.</p></article></div><p class="footnote">* Unless you reset progress or clear your browser's site storage. New items arrive when the open dataset refreshes.</p></section>
     </main>
     <footer class="footer"><div class="wrap footer-inner"><div class="footer-brand">✳ <strong>opportunityorbit</strong><span>A little chaos for a good cause.</span></div><p>An independent experiment using <a href="https://github.com/PerkCommons/data" target="_blank" rel="noopener noreferrer">PerkCommons CC0 open data ↗</a>. Listings are not guarantees of availability or eligibility.</p><div class="footer-links"><a href="https://perkcommons.com/" target="_blank" rel="noopener noreferrer">Explore PerkCommons ↗</a><a href="https://github.com/CodWasTaken/opportunity-orbit" target="_blank" rel="noopener noreferrer">Source code ↗</a></div></div></footer>
     <dialog id="reset-dialog" aria-labelledby="reset-heading"><form method="dialog"><span class="dialog-mark" aria-hidden="true">↺</span><h2 id="reset-heading">Start a fresh orbit?</h2><p>This will clear your discovered opportunities on this browser and put every eligible opportunity back in the wheel.</p><div class="dialog-actions"><button value="cancel" class="dialog-cancel">Keep progress</button><button value="confirm" class="dialog-confirm">Reset everything</button></div></form></dialog>
@@ -97,28 +101,38 @@ function shell(): void {
   $('#reset-dialog').addEventListener('close', () => { if ($<HTMLDialogElement>('#reset-dialog').returnValue === 'confirm') { saved = { ...emptyState(), includeUnconfirmed: saved.includeUnconfirmed }; persist(); phase = 'category'; currentCategory = null; latestResult = null; render(); } });
 }
 function available(): Opportunity[] { return pool(catalog, saved); }
-function sliceLabel(label: string, length = 18): string { return label.length > length ? label.slice(0,length - 1).trimEnd() + '…' : label; }
-function paintWheel(choices: Array<{ label: string; short: string }>): void {
+function sliceLabel(label: string, length = 22): string { return label.length > length ? label.slice(0,length - 1).trimEnd() + '…' : label; }
+type WheelChoice = { label: string; short: string };
+function paintWheel(choices: WheelChoice[]): void {
   const disc = $('#wheel-disc');
   const labels = $('#wheel-labels');
-  const n = Math.max(choices.length, 1); const sector = 360/n;
-  disc.style.background = `conic-gradient(from 0deg, ${choices.map((_,i) => `${selectedWheelColors[i % selectedWheelColors.length]} ${i*sector}deg ${(i+1)*sector}deg`).join(', ')})`;
-  // A label is fixed to the midpoint of its own sector. The parent disc and
-  // every label share exactly the same wheel rotation; no counter-rotation.
-  labels.innerHTML = choices.map((o,i)=>`<span class="sector-label" style="--sector-angle:${(i+.5)*sector}deg" title="${escape(o.label)}">${escape(o.short)}</span>`).join('');
+  const n = choices.length;
+  const sector = 360 / Math.max(n, 1);
+  disc.classList.toggle('dense-wheel', n > 24);
+  disc.classList.toggle('very-dense-wheel', n > 42);
+  disc.setAttribute('aria-label', `${n} distinct choices, one choice per segment`);
+  // Every option gets exactly one segment. Boundaries are geometric sector
+  // fractions; no sampled preview and no duplicated filler options.
+  disc.style.background = n ? `conic-gradient(from 0deg, ${choices.map((_,i) => `${selectedWheelColors[i % selectedWheelColors.length]} ${i*sector}deg ${(i+1)*sector}deg`).join(', ')})` : '#55536c';
+  // Rotate text radially within its segment. The disc rotates as one rigid
+  // surface; each label retains the same angle relative to its own wedge.
+  labels.innerHTML = choices.map((o,i)=>`<span class="sector-label" data-wheel-index="${i}" style="--sector-angle:${(i+.5)*sector}deg" title="${escape(o.label)}">${escape(o.short)}</span>`).join('');
+  const summary = $('#wheel-choice-roster-summary');
+  summary.textContent = `View all ${n} wheel choices by name`;
+  $('#wheel-choice-list').innerHTML = choices.map((o,i)=>`<li><span class="wheel-list-number">${String(i+1).padStart(2,'0')}</span><span>${escape(o.label)}</span></li>`).join('');
   const rotator = $('#wheel-rotator');rotator.style.transition = 'none';rotator.style.transform = 'rotate(0deg)';rotation = 0;
 }
-function previewForCategory(categories: Category[]): void {
-  const sample = shufflePreview(categories, 8);
-  paintWheel(sample.map(x=>({label:x.label,short:sliceLabel(x.label,15)})));
+function categoryWheelChoices(categories: Category[]): WheelChoice[] {
+  return categories.map(x=>({label:x.label,short:sliceLabel(x.label,18)}));
 }
-function previewForOpportunity(opportunities: Opportunity[]): void {
-  const sample = shufflePreview(opportunities, 8);
-  paintWheel(sample.map(x=>({label:x.title,short:sliceLabel(x.provider,14)})));
+function opportunityWheelChoices(opportunities: Opportunity[]): WheelChoice[] {
+  // All candidates are rendered. Dense radial labels show compact names;
+  // the scrollable roster provides every complete title in segment order.
+  const dense=opportunities.length > 42;
+  const compact=opportunities.length > 24;
+  return opportunities.map(x=>({label:x.title, short:sliceLabel(x.title, dense?19:compact?23:28)}));
 }
-function shufflePreview<T>(items: readonly T[], max: number): T[] {
-  const result = [...items];for(let i=result.length-1;i>0;i--){const j=secureIndex(i+1);[result[i],result[j]]=[result[j],result[i]];}return result.slice(0,max);
-}
+
 function historyMarkup(): string {
   const byId = new Map(catalog.opportunities.map(o=>[o.id,o]));
   const items = saved.history.filter(h => byId.has(h.id)).slice(0,5);
@@ -127,6 +141,8 @@ function historyMarkup(): string {
 }
 function render(preserveWheel = false): void {
   const remaining = available();const categories = availableCategories(catalog,remaining);
+  const qualifiedIds = new Set(categories.map(category => category.id));
+  const categoryWheelOptions = remaining.filter(item => qualifiedIds.has(item.category)).length;
   const eligibleTotal = catalog.opportunities.filter(o => saved.includeUnconfirmed || o.status !== 'unconfirmed').length;
   const usedEligible = eligibleTotal-remaining.length;
   const pct = eligibleTotal ? Math.round(usedEligible*100/eligibleTotal) : 0;
@@ -146,17 +162,19 @@ function render(preserveWheel = false): void {
   const reveal=$('#reveal');reveal.hidden=!latestResult;
   if (phase==='category') {
     $('#spin-title').textContent='First, a category.';
-    $('#spin-subtitle').textContent = remaining.length ? `${number(categories.length)} categories available from ${number(remaining.length)} opportunities · ${Math.min(8,categories.length)} shown per spin.` : 'You have explored every available opportunity!';
-    $('#spin-button-label').textContent = remaining.length ? 'SPIN THE CATEGORY' : 'ALL OPPORTUNITIES DISCOVERED';
-    button.disabled = spinning || !remaining.length;
-    if(!spinning && !preserveWheel) previewForCategory(categories);
+    $('#spin-subtitle').textContent = categories.length
+      ? `${number(categories.length)} categories with ${MIN_CATEGORY_OPTIONS}+ remaining options · ${number(categoryWheelOptions)} listings qualify for category spins.`
+      : `No categories have ${MIN_CATEGORY_OPTIONS} remaining options. Try another filter or reset history.`;
+    $('#spin-button-label').textContent = categories.length ? 'SPIN THE CATEGORY' : 'NO ELIGIBLE CATEGORIES';
+    button.disabled = spinning || !categories.length;
+    if(!spinning && !preserveWheel) paintWheel(categoryWheelChoices(categories));
   } else {
     const here=remaining.filter(o=>o.category===currentCategory?.id);
     $('#spin-title').textContent=currentCategory?.label || 'Next, an opportunity.';
-    $('#spin-subtitle').textContent = here.length ? here.length === 1 ? 'This category has one remaining opportunity, so it will be the result.' : `${number(here.length)} undiscovered in this category · ${Math.min(8,here.length)} on the wheel.` : 'That category is fully explored. Pick another!';
+    $('#spin-subtitle').textContent = here.length ? `${number(here.length)} options left in this category. Every option has its own slice.` : 'That category is fully explored. Pick another!';
     $('#spin-button-label').textContent = here.length ? 'SPIN AN OPPORTUNITY' : 'CATEGORY COMPLETED';
     button.disabled = spinning || !here.length;
-    if(!spinning && !preserveWheel) previewForOpportunity(here);
+    if(!spinning && !preserveWheel) paintWheel(opportunityWheelChoices(here));
   }
   if(latestResult) reveal.innerHTML = resultMarkup(latestResult);
   if(!canPersist) $('#remaining-label').textContent += ' · session only';
@@ -179,14 +197,14 @@ async function spin(): Promise<void> {
   const options: Array<Category | Opportunity> = wasCategory ? availableCategories(catalog,remaining) : remaining.filter(o=>o.category===currentCategory?.id);
   if (!options.length) return;
   spinning=true;
-  const outcome=draw(options,Math.min(8,options.length));
-  if (wasCategory) paintWheel(outcome.preview.map(x=>('label' in x ? {label:x.label,short:sliceLabel(x.label,15)} : {label:x.title,short:sliceLabel(x.title,15)})));
-  else paintWheel(outcome.preview.map(x=>('provider' in x ? {label:x.title,short:sliceLabel(x.provider,14)} : {label:x.label,short:sliceLabel(x.label,14)})));
+  // Same order as the idle wheel. No redraw / shortlist reshuffle when the
+  // visitor presses Spin: the pointer lands on the exact displayed choice.
+  const outcome=draw(options);
   const button=$<HTMLButtonElement>('#spin-button');button.disabled=true;$('#spin-button-label').textContent='IN ORBIT…';
   $<HTMLInputElement>('#include-unconfirmed').disabled=true;$('#switch-button').hidden=true;
   const rotator=$('#wheel-rotator');
   // Sector zero starts at 12 o'clock. A positive rotation positions the winner under the fixed pointer.
-  const sector=360/outcome.preview.length;
+  const sector=360/options.length;
   const degrees=360*(5+secureIndex(3))+360-(outcome.winnerIndex+.5)*sector;
   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
     rotator.style.transition=reduceMotion.matches?'none':'transform 4.5s cubic-bezier(.13,.82,.13,1)';
