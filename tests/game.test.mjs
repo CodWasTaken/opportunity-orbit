@@ -16,23 +16,33 @@ test('selected opportunity never occurs again, including after rehydration',()=>
   assert.equal(recordWin(state,'one'),state);
   state=normalizeState(JSON.parse(JSON.stringify(state)));
   assert.deepEqual(pool(catalog,state).map(o=>o.id),['two','three']);
-  assert.deepEqual(availableCategories(catalog,pool(catalog,state)).map(c=>c.id),['a','b']);
+  assert.deepEqual(availableCategories(catalog,pool(catalog,state)).map(c=>c.id),[]);
 });
-test('an opportunity selected from any position ends in the preview exactly once',()=>{
-  const values=Array.from({length:70},(_,i)=>i);
-  for(let winnerIndex=0;winnerIndex<values.length;winnerIndex++){
-    let call=0;
-    const rng=(max)=>call++===0?winnerIndex%max:0;
-    const x=draw(values,8,rng);
-    assert.equal(x.winner,winnerIndex);
-    assert.equal(x.preview.filter(v=>v===x.winner).length,1);
-    assert.equal(x.preview[x.winnerIndex],x.winner);
-    assert.equal(new Set(x.preview).size,x.preview.length);
+test('all choices map one-to-one onto the drawn index, including item 70', () => {
+  const values = Array.from({ length: 70 }, (_, i) => i);
+  for (let winnerIndex = 0; winnerIndex < values.length; winnerIndex++) {
+    const result = draw(values, () => winnerIndex);
+    assert.equal(result.winner, winnerIndex);
+    assert.equal(result.winnerIndex, winnerIndex);
   }
 });
-test('category and opportunity fairness are over the full pool, not preview sample',()=>{
-  const entries=Array.from({length:100},(_,i)=>i);
-  assert.equal(draw(entries,8,max=>max===100?99:0).winner,99);
+test('every opportunity has the same possible index across the full pool', () => {
+  const entries = Array.from({ length: 100 }, (_, i) => i);
+  assert.equal(draw(entries, max => max - 1).winner, 99);
+});
+test('only categories with at least eight currently available records enter the category spin', () => {
+  const entries = [
+    ...Array.from({ length: 8 }, (_, i) => ({id:`a${i}`, category:'a',status:'active'})),
+    ...Array.from({ length: 7 }, (_, i) => ({id:`b${i}`, category:'b',status:'active'})),
+    ...Array.from({ length: 9 }, (_, i) => ({id:`c${i}`, category:'c',status:'active'})),
+  ];
+  const testCatalog = { categories: ['a','b','c'].map(id => ({id, label:id})), opportunities: entries };
+  const all = pool(testCatalog, emptyState());
+  assert.deepEqual(availableCategories(testCatalog, all).map(c => c.id), ['a','c']);
+  const afterOne = all.filter(entry => entry.id !== 'a0');
+  assert.deepEqual(availableCategories(testCatalog, afterOne).map(c => c.id), ['c']);
+  // A category already chosen may still be spun through its final 7.
+  assert.equal(afterOne.filter(entry => entry.category === 'a').length, 7);
 });
 test('invalid or tampered persistent state is handled safely',()=>{
   assert.deepEqual(normalizeState(null),emptyState());

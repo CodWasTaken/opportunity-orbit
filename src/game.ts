@@ -26,9 +26,13 @@ export function pool(catalog: Catalog, state: SavedState): Opportunity[] {
   const excluded = new Set(state.seen);
   return catalog.opportunities.filter(o => !excluded.has(o.id) && (state.includeUnconfirmed || o.status !== 'unconfirmed'));
 }
-export function availableCategories(catalog: Catalog, remaining: Opportunity[]): Category[] {
-  const ids = new Set(remaining.map(o => o.category));
-  return catalog.categories.filter(c => ids.has(c.id));
+/** A category must have at least eight options in the current filtered pool.
+ * A category already chosen can still be played down to its last option. */
+export const MIN_CATEGORY_OPTIONS = 8;
+export function availableCategories(catalog: Catalog, remaining: Opportunity[], minimum = MIN_CATEGORY_OPTIONS): Category[] {
+  const counts = new Map<string, number>();
+  for (const item of remaining) counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+  return catalog.categories.filter(c => (counts.get(c.id) ?? 0) >= minimum);
 }
 
 /** Uniform random index, with rejection sampling to avoid modulo bias. */
@@ -40,22 +44,11 @@ export function secureIndex(max: number): number {
   return buf[0] % max;
 }
 
-/** Pick a winner from the entire pool, then build its visual shortlist. */
-export function draw<T>(items: readonly T[], slots = 8, randomIndex: (n: number) => number = secureIndex): { winner: T; preview: T[]; winnerIndex: number } {
+/** All wheel slices are real options: the secure draw returns their exact index. */
+export function draw<T>(items: readonly T[], randomIndex: (n: number) => number = secureIndex): { winner: T; winnerIndex: number } {
   if (!items.length) throw new Error('No choices left');
-  const winner = items[randomIndex(items.length)];
-  const others = items.filter((_, index) => items[index] !== winner);
-  const previewSize = Math.min(slots, items.length);
-  const preview: T[] = [];
-  for (let i = 0; i < previewSize - 1; i++) {
-    const choice = randomIndex(others.length);
-    preview.push(others[choice]);
-    others[choice] = others[others.length - 1];
-    others.pop();
-  }
-  const winnerIndex = randomIndex(previewSize);
-  preview.splice(winnerIndex, 0, winner);
-  return { winner, preview, winnerIndex };
+  const winnerIndex = randomIndex(items.length);
+  return { winner: items[winnerIndex], winnerIndex };
 }
 
 export function recordWin(state: SavedState, id: string, at = new Date().toISOString()): SavedState {

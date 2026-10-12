@@ -6,11 +6,11 @@ An independent, playful spin-the-wheel project powered by the [PerkCommons publi
 
 ## How it works
 
-- Spin 1 uniformly chooses among categories that still have eligible, unspun opportunities.
-- Spin 2 uniformly chooses among the currently eligible, unspun opportunities in that category.
-- To keep the labels readable, the wheel visually displays up to eight sampled candidates **including the already-uniformly-drawn winner**. The shortlist is not the selection pool; every eligible entry still has the same chance of being chosen.
+- Spin 1 uniformly chooses among categories with **at least eight currently unspun opportunities**. Smaller categories do not appear. With the current 736-entry catalog, this leaves 18 of 20 categories on the first wheel (731 listings in the selectable categories; the other 5 are still in the source catalog). A category drops off future category spins as soon as its remaining count falls below eight.
+- Spin 2 uniformly chooses among **all** currently eligible, unspun opportunities in the selected category. If you stay in that category, you can keep drawing even after fewer than eight remain.
+- **Every selectable option is a wheel segment**, both for categories and individual opportunities. No preview, hidden candidates, or rerandomized slices. Segment labels rotate radially with the wheel; long titles are compacted to fit, and the expandable full-name list directly beneath the wheel shows **every full title in wheel order**. The pointer selects a segment from that complete set.
 - The chosen opportunity is saved to first-party `localStorage` and permanently excluded from future spins **on that browser**, including across reloads. Browsers/devices do not share histories. Private browsing/storage clearing or **Reset history** allows repeats again.
-- You may spin again in the same category or start with a fresh category spin. A depleted category disappears automatically from future spins.
+- You may spin again in the same category or start with a fresh category spin. If you leave a category with fewer than eight remaining results, it will no longer be available on the category wheel unless data or history changes. The underlying 736 records are still available in the source dataset.
 - By default the draw includes all **736 eligible listings**, including 636 marked `unconfirmed`. The optional toggle lets you narrow to 100 active listings. Unconfirmed results include explicit warnings and provider links. General products, unrelated resources, and disputed/expired records remain excluded.
 
 ## Data and updates

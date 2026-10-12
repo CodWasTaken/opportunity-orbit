@@ -6,9 +6,15 @@ test('two-stage spin, browser-local no-repeat history, category switch and reset
   await expect(page.locator('#spin-button-label')).toHaveText('SPIN THE CATEGORY');
   await expect(page.locator('#discovered-count')).toHaveText('0');
   await expect(page.locator('#total-count')).toHaveText('736');
+  await expect(page.locator('.sector-label')).toHaveCount(18);
+  await expect(page.locator('#spin-subtitle')).toContainText('with 8+ remaining options');
+  await expect(page.locator('#spin-subtitle')).toContainText('731 listings qualify');
   await page.locator('#spin-button').click();
   await expect(page.locator('#spin-button-label')).toHaveText('SPIN AN OPPORTUNITY');
   const category=await page.locator('#spin-title').innerText();
+  const count = Number((await page.locator('#spin-subtitle').innerText()).split(' ')[0]);
+  await expect(page.locator('.sector-label')).toHaveCount(count);
+  await expect(page.locator('#wheel-choice-list li')).toHaveCount(count);
   expect(category).not.toBe('First, a category.');
   await page.locator('#spin-button').click();
   await expect(page.locator('#reveal')).toBeVisible();
@@ -20,7 +26,7 @@ test('two-stage spin, browser-local no-repeat history, category switch and reset
   await page.reload();
   await expect(page.locator('#discovered-count')).toHaveText('1');
   await page.locator('#include-unconfirmed').uncheck();
-  // The completed draw may have exhausted a one-item category.
+  // Confirmed-only mode retains the same minimum-eight threshold.
   await expect(page.locator('#total-count')).toHaveText('100');
   await page.locator('#reset-button').click();
   await expect(page.locator('#reset-dialog')).toBeVisible();
@@ -103,4 +109,45 @@ test('wheel labels remain attached to the drawn wedge and the wheel holds its fi
   expect(atRest!.nearTop).toBe(true);
   await page.waitForTimeout(250);
   expect(await page.locator('#wheel-rotator').evaluate(el => getComputedStyle(el).transform)).toBe(atRest!.rotation);
+});
+
+
+test('a 57-option category displays all 57 slices, full-name roster, and lands on the matching wedge', async ({ page }) => {
+  // Fellowships currently contains 57 opportunities in the published catalog.
+  const catalogResponse = await page.request.get('./catalog.json');
+  const catalog = await catalogResponse.json() as {
+    categories: { id:string }[]; opportunities: { category:string; title:string }[];
+  };
+  const grouped = new Map<string, number>();
+  for (const o of catalog.opportunities) grouped.set(o.category, (grouped.get(o.category) ?? 0) + 1);
+  const target = [...grouped.entries()].find(([, count]) => count === Math.max(...grouped.values()))!;
+  expect(target[1]).toBeGreaterThan(50);
+  const qualified = catalog.categories.filter(c => (grouped.get(c.id) ?? 0) >= 8);
+  const targetIndex = qualified.findIndex(c => c.id === target[0]);
+  expect(targetIndex).toBeGreaterThanOrEqual(0);
+  await page.addInitScript(index => {
+    let draws = 0;
+    const original = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = (array: Uint32Array) => {
+      if (array instanceof Uint32Array && array.length === 1) {
+        array[0] = draws++ === 0 ? index : 0;
+        return array;
+      }
+      return original(array);
+    };
+  }, targetIndex);
+  await page.goto('./');
+  await expect(page.locator('.sector-label')).toHaveCount(qualified.length);
+  await page.locator('#spin-button').click();
+  await expect(page.locator('#spin-button-label')).toHaveText('SPIN AN OPPORTUNITY');
+  await expect(page.locator('.sector-label')).toHaveCount(target[1]);
+  await expect(page.locator('#wheel-choice-list li')).toHaveCount(target[1]);
+  await expect(page.locator('#wheel-choice-roster-summary')).toContainText(`all ${target[1]}`);
+  await page.locator('#spin-button').click();
+  await expect(page.locator('#reveal')).toBeVisible();
+  const title = await page.locator('#reveal h2').innerText();
+  expect((await page.locator('.sector-label').evaluateAll((els, winner) => els.filter(el => el.getAttribute('title') === winner).length, title))).toBe(1);
+  await expect(page.locator('#discovered-count')).toHaveText('1');
+  await page.locator('#next-in-category').click();
+  await expect(page.locator('.sector-label')).toHaveCount(target[1] - 1);
 });
